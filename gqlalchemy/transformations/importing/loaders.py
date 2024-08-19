@@ -20,6 +20,7 @@ from string import Template
 from typing import List, Dict, Any, Optional, Union
 
 import adlfs
+import gcsfs
 
 try:
     import pyarrow.dataset as ds
@@ -275,6 +276,32 @@ class AzureBlobFileSystemHandler(FileSystemHandler):
             collection_name: Name of the file to read.
         """
         return f"{self._container_name}/{collection_name}"
+
+
+class GCSFileSystemHandler(FileSystemHandler):
+    """Handles connection to GCS Blob service via gcsfs package."""
+
+    def __init__(self, bucket_name: str, **kwargs) -> None:
+        """Initializes connection and data container.
+
+        Args:
+            bucket_name: Name of the GCS Bucket storing data.
+
+        Kwargs:
+            token: GCP Auth token (optional)
+            project: GCP Project name (optional)
+        """
+
+        super().__init__(fs=gcsfs.GCSFileSystem(**kwargs))
+        self._bucket_name = bucket_name
+
+    def get_path(self, collection_name: str) -> str:
+        """Get file path in file system.
+
+        Args:
+            collection_name: Name of the file to read.
+        """
+        return f"{self._bucket_name}/{collection_name}"
 
 
 class LocalFileSystemHandler(FileSystemHandler):
@@ -753,6 +780,33 @@ class PyArrowS3Importer(PyArrowImporter):
         )
 
 
+class PyArrowGCSImporter(PyArrowImporter):
+    """PyArrowImporter wrapper for use with the Google Cloud Storage File System."""
+
+    def __init__(
+        self,
+        bucket_name: str,
+        file_extension_enum: PyArrowFileTypeEnum,
+        data_configuration: Dict[str, Any],
+        memgraph: Optional[Memgraph] = None,
+        **kwargs,
+    ) -> None:
+        """
+        Args:
+            bucket_name: Name of the bucket in S3 to read from.
+            file_extension_enum: File format to be read.
+            data_configuration: Configuration for the translations.
+            memgraph: Connection to Memgraph (Optional).
+            **kwargs: Specified for S3FileSystem.
+        """
+        super().__init__(
+            file_system_handler=GCSFileSystemHandler(bucket_name=bucket_name, **kwargs),
+            file_extension_enum=file_extension_enum,
+            data_configuration=data_configuration,
+            memgraph=memgraph,
+        )
+
+
 class PyArrowAzureBlobImporter(PyArrowImporter):
     """PyArrowImporter wrapper for use with the Azure Blob File System."""
 
@@ -827,6 +881,28 @@ class ParquetS3FileSystemImporter(PyArrowS3Importer):
         )
 
 
+class ParquetGCSFileSystemImporter(PyArrowGCSImporter):
+    """PyArrowS3Importer wrapper for use with the GCS file system and the parquet file type."""
+
+    def __init__(
+        self, bucket_name: str, data_configuration: Dict[str, Any], memgraph: Optional[Memgraph] = None, **kwargs
+    ) -> None:
+        """
+        Args:
+            bucket_name: Name of the bucket in GCS to read from.
+            data_configuration: Configuration for the translations.
+            memgraph: Connection to Memgraph (Optional).
+            **kwargs: Specified for GCSFileSystem.
+        """
+        super().__init__(
+            bucket_name=bucket_name,
+            file_extension_enum=PyArrowFileTypeEnum.Parquet,
+            data_configuration=data_configuration,
+            memgraph=memgraph,
+            **kwargs,
+        )
+
+
 class CSVS3FileSystemImporter(PyArrowS3Importer):
     """PyArrowS3Importer wrapper for use with the S3 file system and the CSV file type."""
 
@@ -836,6 +912,28 @@ class CSVS3FileSystemImporter(PyArrowS3Importer):
         """
         Args:
             bucket_name: Name of the bucket in S3 to read from.
+            data_configuration: Configuration for the translations.
+            memgraph: Connection to Memgraph (Optional).
+            **kwargs: Specified for S3FileSystem.
+        """
+        super().__init__(
+            bucket_name=bucket_name,
+            file_extension_enum=PyArrowFileTypeEnum.CSV,
+            data_configuration=data_configuration,
+            memgraph=memgraph,
+            **kwargs,
+        )
+
+
+class CSVGCSFileSystemImporter(PyArrowGCSImporter):
+    """PyArrowS3Importer wrapper for use with the GCS file system and the CSV file type."""
+
+    def __init__(
+        self, bucket_name: str, data_configuration: Dict[str, Any], memgraph: Optional[Memgraph] = None, **kwargs
+    ) -> None:
+        """
+        Args:
+            bucket_name: Name of the bucket in GCS to read from.
             data_configuration: Configuration for the translations.
             memgraph: Connection to Memgraph (Optional).
             **kwargs: Specified for S3FileSystem.
@@ -871,7 +969,51 @@ class ORCS3FileSystemImporter(PyArrowS3Importer):
         )
 
 
+class ORCGCSFileSystemImporter(PyArrowGCSImporter):
+    """PyArrowGCSImporter wrapper for use with the GCS file system and the ORC file type."""
+
+    def __init__(
+        self, bucket_name: str, data_configuration: Dict[str, Any], memgraph: Optional[Memgraph] = None, **kwargs
+    ) -> None:
+        """
+        Args:
+            bucket_name: Name of the bucket in GCS to read from.
+            data_configuration: Configuration for the translations.
+            memgraph: Connection to Memgraph (Optional).
+            **kwargs: Specified for S3FileSystem.
+        """
+        super().__init__(
+            bucket_name=bucket_name,
+            file_extension_enum=PyArrowFileTypeEnum.ORC,
+            data_configuration=data_configuration,
+            memgraph=memgraph,
+            **kwargs,
+        )
+
+
 class FeatherS3FileSystemImporter(PyArrowS3Importer):
+    """PyArrowS3Importer wrapper for use with the S3 file system and the feather file type."""
+
+    def __init__(
+        self, bucket_name: str, data_configuration: Dict[str, Any], memgraph: Optional[Memgraph] = None, **kwargs
+    ) -> None:
+        """
+        Args:
+            bucket_name: Name of the bucket in S3 to read from.
+            data_configuration: Configuration for the translations.
+            memgraph: Connection to Memgraph (Optional).
+            **kwargs: Specified for S3FileSystem.
+        """
+        super().__init__(
+            bucket_name=bucket_name,
+            file_extension_enum=PyArrowFileTypeEnum.Feather,
+            data_configuration=data_configuration,
+            memgraph=memgraph,
+            **kwargs,
+        )
+
+
+class FeatherGCSFileSystemImporter(PyArrowGCSImporter):
     """PyArrowS3Importer wrapper for use with the S3 file system and the feather file type."""
 
     def __init__(
